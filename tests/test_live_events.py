@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from conversation_store import ConversationStore, iso
 from install_observers import merge_hooks
-from live_events import COMPACTION_WINDOW, LiveEventStore, PENDING_WINDOW, record_hook
+from live_events import COMPACTION_WINDOW, LiveEventStore, PENDING_WINDOW, record_hook, take_decision
 from platform_support import hook_references
 import observer_hook
 
@@ -46,6 +46,41 @@ class ObserverTests(unittest.TestCase):
         record_hook(self.path, "Codex", self.event("PermissionRequest"))
         record_hook(self.path, "Codex", self.event("PostToolUse", tool_input={"command": "another command"}))
         self.assertEqual(len(self.state()["pending"]), 1)
+
+    def test_app_handoff_survives_compaction_resume_and_quiet_transcript(self):
+        record_hook(self.path, "Codex", self.event("PermissionRequest", turn_id="one"),
+                    now=self.now, request_id="request", answer_until=self.now + 120)
+        self.assertIsNone(take_decision(self.path, "codex:" + SESSION, "request",
+                                       give_up=True, now=self.now + 120))
+        for offset, event in [(121, "PreCompact"), (240, "PostCompact"), (241, "SessionStart")]:
+            record_hook(self.path, "Codex", self.event(event, turn_id="one"), now=self.now + offset)
+        quiet = {**self.card(), "status": "unknown", "activity_at": iso(self.now - 100)}
+        card = self.store.overlay(quiet, self.state(), now=self.now + 360)
+        self.assertEqual(card["status"], "needs_you")
+        self.assertTrue(card["pending_requests"][0]["handed_back"])
+        self.assertFalse(card["pending_requests"][0]["answerable"])
+        self.assertEqual(card["pending_requests"][0]["actions"], [])
+        record_hook(self.path, "Codex", self.event("PostToolUse", turn_id="one"), now=self.now + 361)
+        self.assertEqual(self.state()["pending"], [])
+
+    def test_same_command_with_different_tool_ids_does_not_clear_approval(self):
+        record_hook(self.path, "Codex", self.event("PermissionRequest", tool_use_id="waiting"))
+        record_hook(self.path, "Codex", self.event("PostToolUse", tool_use_id="other"))
+        self.assertEqual(len(self.state()["pending"]), 1)
+        record_hook(self.path, "Codex", self.event("PostToolUse", tool_use_id="waiting"))
+        self.assertEqual(self.state()["pending"], [])
+
+    def test_result_from_another_turn_does_not_clear_approval(self):
+        record_hook(self.path, "Codex", self.event("PermissionRequest", turn_id="new"))
+        record_hook(self.path, "Codex", self.event("PostToolUse", turn_id="old"))
+        self.assertEqual(len(self.state()["pending"]), 1)
+
+    def test_parallel_identical_commands_keep_separate_requests(self):
+        for use_id in ["first", "second"]:
+            record_hook(self.path, "Codex", self.event("PermissionRequest", tool_use_id=use_id))
+        self.assertEqual(len(self.state()["pending"]), 2)
+        record_hook(self.path, "Codex", self.event("PostToolUse", tool_use_id="second"))
+        self.assertEqual([p["tool_use_id"] for p in self.state()["pending"]], ["first"])
 
     def test_stop_or_new_prompt_clears_stale_pending_requests(self):
         for kind in ["Stop", "UserPromptSubmit", "Interrupt", "SessionEnd"]:

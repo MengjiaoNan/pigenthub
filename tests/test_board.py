@@ -37,12 +37,16 @@ class BoardTests(unittest.TestCase):
                 "payload": {"type": "message", "role": role,
                             "content": [{"type": "input_text", "text": text}]}}
 
-    def test_completion_requires_explicit_end_not_file_recency(self):
+    def test_quiet_codex_turn_stays_running_until_explicit_end(self):
         self.write(self.path, [self.meta(), self.event("task_started", -200, turn_id="one"),
                                self.message("assistant", "still working", -180)])
         transcript = read_codex(self.path)
-        self.assertEqual(transcript.card(self.now)["status"], "unknown")
+        self.assertEqual(transcript.card(self.now)["status"], "running")
+        self.assertIn("等待", transcript.card(self.now)["status_reason"])
         self.assertNotEqual(transcript.card(self.now)["status"], "done")
+        with self.path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(self.event("task_complete", turn_id="one")) + "\n")
+        self.assertEqual(read_codex(self.path).card(self.now)["status"], "done")
 
     def test_full_history_is_opt_in_cached_and_invalidated_without_summary_calls(self):
         rows = [self.meta()] + [self.message("user" if i % 2 == 0 else "assistant", f"message {i}", i)
@@ -87,7 +91,19 @@ class BoardTests(unittest.TestCase):
         self.assertEqual(item.card(self.now)["status_reason"], "上下文压缩已完成，继续处理本轮")
         self.assertFalse(any("INTERNAL" in m["text"] for m in item.messages))
         self.assertEqual(item.events[-1]["message"], "上下文压缩已完成")
-        self.assertEqual(item.card(self.now + 200)["status"], "unknown")
+        self.assertEqual(item.card(self.now + 200)["status"], "running")
+
+    def test_codex_tool_output_refreshes_activity_without_exposing_payload(self):
+        self.write(self.path, [self.meta(), self.event("task_started", -300, turn_id="one"),
+                              {"type": "response_item", "timestamp": iso(self.now - 200),
+                               "payload": {"type": "custom_tool_call", "name": "long_tool"}},
+                              {"type": "response_item", "timestamp": iso(self.now - 1),
+                               "payload": {"type": "custom_tool_call_output", "output": "PRIVATE TOOL DATA"}}])
+        item = read_codex(self.path)
+        self.assertEqual(item.card(self.now)["activity_at"], iso(self.now - 1))
+        self.assertEqual(item.card(self.now)["status"], "running")
+        self.assertEqual(item.events[-1]["message"], "工具执行结果已写入")
+        self.assertFalse(any("PRIVATE" in message["text"] for message in item.messages))
 
     def test_compaction_completion_does_not_reopen_a_finished_turn(self):
         self.write(self.path, [self.meta(), self.event("task_complete", -10),
