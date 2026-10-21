@@ -2,6 +2,7 @@
 
 const $ = selector => document.querySelector(selector);
 const labels = {needs_you:"Needs you",running:"Running",done:"Turn complete",unknown:"Unconfirmed",cancelled:"Interrupted",failed:"Needs attention"};
+// Translate legacy system text stored by earlier versions. New events use English.
 const systemCopy = {
   "任务摘录":"Task excerpt", "回复摘录":"Reply excerpt", "最新进展摘录":"Progress excerpt",
   "未命名对话":"Untitled conversation", "尚无文字回复":"No reply yet",
