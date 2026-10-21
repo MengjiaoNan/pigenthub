@@ -70,14 +70,14 @@ Card expansion is preserved across the three-second refresh cycle. Opening a sum
 
 - Codex adapters use turn events such as `task_started`, `task_complete`, and `turn_aborted`, correlated with the current turn ID.
 - Claude Code adapters use assistant tool calls and completion evidence such as `stop_reason: end_turn`. A new user message clears a previous completed-turn state.
-- A normal Running state with no recent activity becomes unconfirmed after 90 seconds. A quiet log does not imply completion.
+- A Codex turn with an explicit start remains Running until completion or interruption is recorded. After 90 seconds without activity, its description says it is waiting for an update. A quiet log does not imply completion. Claude activity inferred from transcript messages becomes unconfirmed after 90 seconds without further evidence.
 - Supported hook requests add approval or question signals. New input, completion, interruption, or corresponding tool results clear relevant waiting states. Stale requests become unconfirmed after 30 minutes without further evidence.
 - An approval may remain visible while the approved tool is still running, until its completion event arrives. Delayed notifications can also affect timing.
 - Summary generation never determines whether an agent turn is complete.
 
 ### Context compaction
 
-Codex `PreCompact` and `PostCompact` hooks passively record compaction events. While compaction is active, the board displays Compacting context under Running and suspends the usual 90-second inactivity rule. Subsequent work, completion, interruption, or session end clears the phase. After 30 minutes without further evidence, the state becomes unconfirmed.
+Codex `PreCompact` and `PostCompact` hooks passively record compaction events. While compaction is active, the board displays Compacting context under Running. Subsequent work, completion, interruption, or session end clears the phase. After 30 minutes without further evidence, the compaction state becomes unconfirmed. Compaction and session resume preserve unresolved approvals, which take precedence and remain under Needs you, including after the answer timer hands the request back to the agent app. A matching tool result, new prompt, completion, interruption, or session end clears the approval; requests older than 30 minutes become unconfirmed.
 
 Compacted transcript records update progress without exposing internal compaction summaries in the conversation view. Newer activity or completion evidence takes precedence over older hook events.
 
@@ -91,6 +91,8 @@ The installer can target `codex`, `claude`, or `both`. A preview writes merged J
 Existing configuration is backed up under `.board/hook-backups/`. The installer replaces PigentHub's own handlers while preserving other hooks and settings. It does not set hook trust or change permission rules.
 
 Passive observer hooks record events without producing approval decisions. Approval handlers wait for a user response while the board is online; if the board is unavailable, an error occurs, or the wait expires, they produce no response and leave handling to the agent. Some agent-specific events only provide notifications rather than an answerable request.
+
+Codex approval hooks run before the native approval flow. While a synchronous hook waits for a board answer, the app's native prompt is not simultaneously available. Concurrent responses and immediate dismissal in both interfaces would require a shared live approval channel and request-resolution events. The current hook integration has neither; app answers are inferred from subsequent tool or turn events rather than an immediate approval-resolution acknowledgement.
 
 On Windows, Claude handlers invoke Python directly. Codex handlers use an encoded PowerShell command to forward UTF-8 event data. On macOS and Linux, handlers use POSIX command quoting.
 
