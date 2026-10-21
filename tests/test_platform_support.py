@@ -69,11 +69,12 @@ class PlatformTests(unittest.TestCase):
             payload = {"session_id": "88fa01dd-3b81-4e8e-94f5-4d104d307a53",
                        "hook_event_name": "PermissionRequest", "tool_name": "Write",
                        "tool_input": {"description": "请求写入中文文件"}}
-            for source in ["Codex", "Claude"]:
+            for source, prefix in [("Codex", ""), ("Claude", ""),
+                                   ("Codex", "\ufeff"), ("Claude", "\ufeff")]:
                 handler = observer_handler(source, root=root, interpreter=sys.executable)
                 command = [handler["command"], *handler["args"]] if "args" in handler else handler["command"]
                 result = subprocess.run(command, shell=isinstance(command, str),
-                                        input=json.dumps(payload, ensure_ascii=False),
+                                        input=prefix + json.dumps(payload, ensure_ascii=False),
                                         text=True, encoding="utf-8", capture_output=True, timeout=15)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "")

@@ -83,9 +83,9 @@ class AnswerTests(unittest.TestCase):
         self.assertEqual(answer["hookSpecificOutput"]["permissionDecision"], "deny")
         self.assertIn("8080", answer["hookSpecificOutput"]["permissionDecisionReason"])
 
-    def run_hook(self, online):
+    def run_hook(self, online, prefix=""):
         output = io.StringIO()
-        payload = json.dumps(self.event())
+        payload = prefix + json.dumps(self.event())
         with patch.object(approval_hook, "ROOT", self.root), patch("approval_hook.board_online", return_value=online), \
              patch("approval_hook.wait_for_decision", return_value={"action": "allow", "message": ""}) as waited, \
              patch("approval_hook.sys.stdin", io.StringIO(payload)), patch("approval_hook.sys.stdout", output), \
@@ -106,6 +106,11 @@ class AnswerTests(unittest.TestCase):
              patch("approval_hook.sys.argv", ["approval_hook.py", "claude"]):
             approval_hook.main()
         self.assertEqual(output.getvalue(), "")
+
+    def test_hook_accepts_utf8_bom_from_windows_forwarding(self):
+        output, waited = self.run_hook(online=True, prefix="\ufeff")
+        waited.assert_called_once()
+        self.assertEqual(json.loads(output)["hookSpecificOutput"]["decision"]["behavior"], "allow")
 
 
 class DeliveryTests(unittest.TestCase):
