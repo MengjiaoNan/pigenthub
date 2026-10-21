@@ -106,7 +106,7 @@ A collected message is marked as handed to a hook. This does not acknowledge tha
 
 ## Summary generation and caching
 
-The summary service uses an authenticated Claude Code CLI. It prefers an explicit `BOARD_CLAUDE_CLI`, then a local native installation or an executable on PATH. The default prompt requests a short Chinese summary; changing `BOARD_SUMMARY_MODEL` changes the model, not the output language.
+The summary service uses an authenticated Claude Code CLI. It prefers an explicit `BOARD_CLAUDE_CLI`, then a local native installation or an executable on PATH. The default prompt requests a short English summary; changing `BOARD_SUMMARY_MODEL` changes the model, not the output language.
 
 Replies longer than 320 characters are eligible for the summary action. Generation is disabled while the conversation is running or waiting for a response. Replies over 100,000 characters are rejected rather than silently truncated.
 
