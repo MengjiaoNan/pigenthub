@@ -139,6 +139,8 @@ For Codex, review and trust the added hooks through `/hooks` in the Codex CLI, t
 
 Supported requests appear under Needs you. You can respond while the request is active; if no response arrives before the configured timeout, control returns to the agent's own interface. Adjust the wait time in the dashboard settings.
 
+For Codex, this is a sequential handoff: its native approval prompt waits until the board's synchronous hook finishes. The current integration does not support answering the same approval concurrently in both interfaces. After handoff, the board keeps a non-actionable reminder until a corresponding tool result or turn-ending event arrives; an answer in the app may therefore take time to clear from the board.
+
 ## Send a follow-up
 
 Open a conversation and use its message composer.
