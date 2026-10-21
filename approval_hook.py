@@ -61,7 +61,8 @@ def delivery_output(source, event, messages):
 def main():
     try:
         source = {"codex": "Codex", "claude": "Claude"}.get(sys.argv[1])
-        payload = json.load(sys.stdin)
+        # Windows PowerShell may prefix redirected UTF-8 input with a BOM.
+        payload = json.loads(sys.stdin.read().lstrip("\ufeff"))
         database = ROOT / ".board" / "live-events.sqlite3"
         event = payload.get("hook_event_name") if isinstance(payload, dict) else None
         key = session_key(source, payload) if source and isinstance(payload, dict) else None

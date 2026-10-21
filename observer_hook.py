@@ -8,7 +8,8 @@ from live_events import record_hook
 
 def main():
     try:
-        payload = json.load(sys.stdin)
+        # Windows PowerShell may prefix redirected UTF-8 input with a BOM.
+        payload = json.loads(sys.stdin.read().lstrip("\ufeff"))
         source = {"codex": "Codex", "claude": "Claude"}.get(sys.argv[1])
         record_hook(Path(__file__).parent / ".board" / "live-events.sqlite3", source, payload)
     except Exception:
