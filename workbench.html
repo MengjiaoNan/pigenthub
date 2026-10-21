@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="PigentHub — a little hub for your agents. Follow progress, catch approvals, and keep every conversation in view.">
+  <title>PigentHub · Your agent workspace</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/vendor/katex.min.css">
+  <link rel="stylesheet" href="/assets/workbench.css">
+  <script src="/assets/vendor/marked.min.js" defer></script>
+  <script src="/assets/vendor/purify.min.js" defer></script>
+  <script src="/assets/vendor/katex.min.js" defer></script>
+  <script src="/assets/workbench.js" defer></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Projects">
+      <div class="side-scroll">
+        <button class="side-item side-all" id="all-projects" type="button" aria-pressed="true"><span class="side-name">All projects</span><span class="side-count" id="all-count">0</span></button>
+        <section class="side-section focus-zone" id="focus-zone" aria-labelledby="focus-heading">
+          <h2 id="focus-heading">Focus</h2>
+          <ul class="side-list" id="focus-list"></ul>
+          <p class="drop-hint" id="focus-hint">Drag a card here to keep that conversation close at hand.</p>
+        </section>
+        <section class="side-section" aria-labelledby="recent-heading">
+          <h2 id="recent-heading">Projects</h2>
+          <ul class="side-list" id="recent-list"></ul>
+        </section>
+      </div>
+      <div class="side-bottom">
+        <div class="side-clock"><time id="side-clock">--:--</time><span id="side-date"></span></div>
+        <p class="side-state" id="side-state">Connecting…</p>
+        <label class="side-setting">Answer on board for
+          <select id="wait-select" aria-label="How long agents wait for your answer on the board"></select>
+        </label>
+      </div>
+    </aside>
+    <div class="shell">
+      <header class="top">
+        <div class="brand">
+          <h1><span class="wordmark">Pigent<span>Hub</span></span><svg class="snout" viewBox="0 0 64 44" aria-hidden="true"><path class="snout-face" d="M32 3C50 3 61 9.5 61 22S50 41 32 41 3 34.5 3 22 14 3 32 3Z"/><ellipse class="nostril" cx="22.5" cy="22" rx="4.4" ry="6.6"/><ellipse class="nostril" cx="41.5" cy="22" rx="4.4" ry="6.6"/></svg></h1>
+          <p class="subtitle">Keep your agents in the loop.</p>
+        </div>
+        <div class="sync-group"><span id="connection" role="status">Connecting to your workspace</span><button class="quiet sync-button" id="refresh" aria-label="Sync conversations"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M6.1 7a7 7 0 0 1 11.5-1L20 9M4 15l2.4 3A7 7 0 0 0 17.9 17"/></svg><span>Sync</span></button></div>
+      </header>
+      <div class="toolbar">
+        <div class="filters" aria-label="Filter by agent">
+          <button class="filter" data-source="all" aria-pressed="true">All agents <span data-filter-count="all">0</span></button>
+          <button class="filter" data-source="Codex" aria-pressed="false">Codex <span data-filter-count="Codex">0</span></button>
+          <button class="filter" data-source="Claude" aria-pressed="false">Claude Code <span data-filter-count="Claude">0</span></button>
+        </div>
+        <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="search" type="search" placeholder="Find a conversation or project…" aria-label="Search conversations or projects"></label>
+      </div>
+      <p id="notice" role="alert"></p>
+      <main aria-label="Agent conversation board">
+        <section class="column needs-you" aria-labelledby="needs-heading"><div class="column-head"><h3 id="needs-heading"><i class="dot"></i>Needs you <span class="count" id="count-needs_you">0</span></h3><p>Approvals &amp; questions</p></div><div class="card-list" id="needs_you"></div></section>
+        <section class="column running" aria-labelledby="running-heading"><div class="column-head"><h3 id="running-heading"><i class="dot"></i>Running <span class="count" id="count-running">0</span></h3><p>A little work in progress</p></div><div class="card-list" id="running"></div></section>
+        <section class="column done" aria-labelledby="done-heading"><div class="column-head"><h3 id="done-heading"><i class="dot"></i>Done <span class="count" id="count-done">0</span></h3><p>Completed turns, ready to review</p></div><div class="card-list" id="done"></div></section>
+      </main>
+      <details class="history" id="unknown-section">
+        <summary>Unconfirmed &amp; interrupted <span id="unknown-count"></span><span class="history-hint">Last recorded activity, awaiting a confirmed status</span></summary><div id="unknown"></div>
+      </details>
+      <footer class="footer"><div><span id="total">Loading your conversations…</span><p id="observer-status"></p></div><div class="footer-note">Made for a little peace of mind.<span>Auto-syncs every 3s · AI summaries are optional and use Claude quota.</span></div></footer>
+      <p class="sr-only" id="board-announcement" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+  <div class="backdrop" id="backdrop" hidden></div>
+  <aside class="drawer" id="details" role="dialog" aria-labelledby="drawer-heading" hidden>
+    <div class="drawer-top">
+      <div class="chat-head"><span class="drawer-eyebrow" id="chat-meta">Conversation</span><h2 id="drawer-heading">Conversation</h2></div>
+      <div class="chat-tools" id="chat-tools"></div>
+      <button class="quiet moments-toggle" id="moments-toggle" type="button" aria-expanded="false" aria-controls="moments"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Key moments</span></button>
+      <button class="icon-button" id="close" aria-label="Close conversation"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+    <div class="chat-body">
+      <div id="detail-content" class="chat-scroll" tabindex="-1"></div>
+      <nav id="moments" class="moments" aria-label="Conversation key moments" hidden>
+        <div class="moments-head"><h3>Key moments</h3><p>Local outline · 0 tokens</p></div>
+        <p class="moments-help">Your prompts, reply headings and responses. Extracted locally, without AI ranking.</p>
+        <input id="moments-search" type="search" placeholder="Find a moment…" aria-label="Search key moments">
+        <div class="moments-filters" aria-label="Moment types"><button type="button" data-moment-type="all" aria-pressed="true">All</button><button type="button" data-moment-type="prompt" aria-pressed="false">Prompts</button><button type="button" data-moment-type="heading" aria-pressed="false">Headings</button><button type="button" data-moment-type="reply" aria-pressed="false">Replies</button></div>
+        <p id="moments-count" class="moments-count" role="status"></p>
+        <ol id="moments-list" class="moments-list"></ol>
+        <button id="jump-latest" type="button" class="quiet">Jump to latest ↓</button>
+      </nav>
+    </div>
+    <form class="composer" id="composer">
+      <div class="composer-box">
+        <textarea id="composer-text" rows="1" placeholder="Message…" aria-label="Message to the agent"></textarea>
+        <button class="send-button" id="composer-send" type="submit" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+      </div>
+      <p class="composer-hint" id="composer-hint"></p>
+    </form>
+  </aside>
+</body>
+</html>
