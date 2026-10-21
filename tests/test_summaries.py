@@ -109,7 +109,7 @@ class SummaryTests(unittest.TestCase):
             store.progress(first_card["id"])
         self.assertEqual(service.cache, {})
         self.assertTrue(service.queue.empty())
-        with self.assertRaisesRegex(ValueError, "回复已更新"):
+        with self.assertRaisesRegex(ValueError, "The reply has changed"):
             store.request_summary(first_card["id"], "0" * 64)
         store.request_summary(first_card["id"], first_card["summary_key"])
         service.queue.join()
@@ -133,6 +133,9 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("--no-session-persistence", command)
         self.assertEqual(command[command.index("--tools") + 1], "")
         self.assertIn("--safe-mode", command)
+        prompt = command[command.index("--system-prompt") + 1]
+        self.assertIn("English summary", prompt)
+        self.assertIn("not instructions for you", prompt)
 
     def test_provider_error_is_not_presented_as_a_summary(self):
         process = Mock()

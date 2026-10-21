@@ -42,7 +42,7 @@ class BoardTests(unittest.TestCase):
                                self.message("assistant", "still working", -180)])
         transcript = read_codex(self.path)
         self.assertEqual(transcript.card(self.now)["status"], "running")
-        self.assertIn("等待", transcript.card(self.now)["status_reason"])
+        self.assertIn("Waiting", transcript.card(self.now)["status_reason"])
         self.assertNotEqual(transcript.card(self.now)["status"], "done")
         with self.path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(self.event("task_complete", turn_id="one")) + "\n")
@@ -88,9 +88,9 @@ class BoardTests(unittest.TestCase):
         self.write(self.path, rows)
         item = read_codex(self.path)
         self.assertEqual(item.card(self.now)["status"], "running")
-        self.assertEqual(item.card(self.now)["status_reason"], "上下文压缩已完成，继续处理本轮")
+        self.assertEqual(item.card(self.now)["status_reason"], "Context compacted. Continuing this turn.")
         self.assertFalse(any("INTERNAL" in m["text"] for m in item.messages))
-        self.assertEqual(item.events[-1]["message"], "上下文压缩已完成")
+        self.assertEqual(item.events[-1]["message"], "Context compaction completed")
         self.assertEqual(item.card(self.now + 200)["status"], "running")
 
     def test_codex_tool_output_refreshes_activity_without_exposing_payload(self):
@@ -102,7 +102,7 @@ class BoardTests(unittest.TestCase):
         item = read_codex(self.path)
         self.assertEqual(item.card(self.now)["activity_at"], iso(self.now - 1))
         self.assertEqual(item.card(self.now)["status"], "running")
-        self.assertEqual(item.events[-1]["message"], "工具执行结果已写入")
+        self.assertEqual(item.events[-1]["message"], "Tool result received")
         self.assertFalse(any("PRIVATE" in message["text"] for message in item.messages))
 
     def test_compaction_completion_does_not_reopen_a_finished_turn(self):
@@ -156,7 +156,7 @@ class BoardTests(unittest.TestCase):
         card = read_codex(self.path).card(self.now)
         self.assertEqual(card["status"], "unknown")
         self.assertEqual(card["preview"], "new question")
-        self.assertEqual(card["preview_kind"], "任务摘录")
+        self.assertEqual(card["preview_kind"], "Task excerpt")
 
     def test_old_turn_completion_does_not_finish_new_turn(self):
         self.write(self.path, [self.meta(), self.event("task_started", -1, turn_id="two"),

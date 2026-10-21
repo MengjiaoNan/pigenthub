@@ -32,7 +32,7 @@ class ObserverTests(unittest.TestCase):
         return self.store.snapshot()[source.lower() + ":" + SESSION]
 
     def card(self):
-        return {"status": "running", "status_reason": "运行中", "started_at": iso(self.now - 10), "finished_at": None}
+        return {"status": "running", "status_reason": "Running", "started_at": iso(self.now - 10), "finished_at": None}
 
     def test_permission_enters_needs_you_and_matching_result_clears_it(self):
         record_hook(self.path, "Codex", self.event("PermissionRequest"), now=self.now)
@@ -93,7 +93,7 @@ class ObserverTests(unittest.TestCase):
         stale = {**self.card(), "status": "unknown", "activity_at": iso(self.now - 100)}
         card = self.store.overlay(dict(stale), self.state(), now=self.now + 180)
         self.assertEqual((card["status"], card["activity_phase"]), ("running", "compacting"))
-        self.assertEqual(card["status_reason"], "正在压缩上下文")
+        self.assertEqual(card["status_reason"], "Compacting context")
         expired = self.store.overlay(dict(stale), self.state(), now=self.now + COMPACTION_WINDOW + 1)
         self.assertEqual(expired["status"], "unknown")
 
@@ -156,7 +156,7 @@ class ObserverTests(unittest.TestCase):
         self.assertEqual(store.snapshot()["conversations"][0]["status"], "needs_you")
         progress = store.progress("codex:" + SESSION)
         self.assertEqual(progress["status"], "needs_you")
-        self.assertTrue(any("审批" in event["message"] for event in progress["events"]))
+        self.assertTrue(any("Approval requested:" in event["message"] for event in progress["events"]))
         self.assertEqual(path.read_bytes(), before)
 
     def test_merging_preserves_permissions_and_other_hooks_and_is_idempotent(self):

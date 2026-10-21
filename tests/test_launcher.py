@@ -92,7 +92,7 @@ class LauncherTests(unittest.TestCase):
         with patch.object(second, "environment", side_effect=AssertionError("must reuse server")):
             self.assertEqual(second.start(), (url, False))
         self.assertEqual(second.state()["pid"], original["pid"])
-        self.assertIn("已停止", second.stop())
+        self.assertIn("stopped", second.stop())
         self.launcher.process.wait(timeout=5)
         self.assertIsNone(self.launcher.health(self.port))
         self.assertFalse(second.state_path.exists())
@@ -103,7 +103,7 @@ class LauncherTests(unittest.TestCase):
         url, started = self.launcher.start(python=sys.executable)
         self.assertTrue(started)
         self.assertEqual(url, f"http://127.0.0.1:{self.port}/")
-        self.assertIn("已停止", self.launcher.stop())
+        self.assertIn("stopped", self.launcher.stop())
         self.launcher.process.wait(timeout=5)
         self.assertEqual(self.launcher.health(busy)["app"], "some-other-program")
 
@@ -116,7 +116,7 @@ class LauncherTests(unittest.TestCase):
             self.launcher.process = other.process
         self.assertEqual(sum(started for _, started in results), 1)
         self.assertEqual(results[0][0], results[1][0])
-        self.assertIn("已停止", self.launcher.stop())
+        self.assertIn("stopped", self.launcher.stop())
         self.launcher.process.wait(timeout=5)
 
     def test_stale_state_cannot_stop_unrelated_server(self):
@@ -125,7 +125,7 @@ class LauncherTests(unittest.TestCase):
         self.launcher.state_path.write_text(json.dumps({"port": port, "pid": os.getpid(),
             "launch_id": "old-launch", "instance_id": self.launcher.identity}))
         with patch("launcher.os.kill", side_effect=AssertionError("unrelated process signalled")):
-            self.assertIn("旧的启动记录", self.launcher.stop())
+            self.assertIn("stale launch record", self.launcher.stop())
         self.assertIsNotNone(self.launcher.health(port))
 
     def test_unresponsive_server_keeps_state_for_a_later_retry(self):
@@ -144,7 +144,7 @@ class LauncherTests(unittest.TestCase):
         time.sleep(0.5)
         self.assertTrue(self.launcher.ours(self.launcher.health(self.port)))
         with patch("launcher.os.kill", side_effect=AssertionError("new servers use graceful shutdown")):
-            self.assertIn("已停止", self.launcher.stop())
+            self.assertIn("stopped", self.launcher.stop())
         self.launcher.process.wait(timeout=5)
 
 

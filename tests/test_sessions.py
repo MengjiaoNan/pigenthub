@@ -58,7 +58,7 @@ class SessionReaderTests(unittest.TestCase):
     def test_missing_directory_has_clear_diagnostic(self):
         conversations, warnings = scan_sessions(self.home / "missing")
         self.assertEqual(conversations, [])
-        self.assertIn("没有找到 Codex 会话目录", warnings[0])
+        self.assertIn("Codex conversation directory not found", warnings[0])
 
     def test_old_event_only_record(self):
         self.write_session([

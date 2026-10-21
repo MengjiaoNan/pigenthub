@@ -52,22 +52,22 @@ class AnswerTests(unittest.TestCase):
         self.ask(wait=5)
         self.assertIsNone(take_decision(self.db, KEY, "req-0001", give_up=True, now=self.now + 6))
         self.assertTrue(self.pending()[0]["handed_back"])
-        self.assertEqual(submit_decision(self.db, KEY, "req-0001", "allow", now=self.now + 7), "已超过看板作答时间，请到原应用处理")
+        self.assertEqual(submit_decision(self.db, KEY, "req-0001", "allow", now=self.now + 7), "Time's up for answering here. Please answer in the agent app.")
         card = LiveEventStore.overlay({"status": "running"}, LiveEventStore(self.db).snapshot()[KEY], now=self.now + 8)
         self.assertFalse(card["pending_requests"][0]["answerable"])
 
     def test_answers_are_validated(self):
         self.ask()
-        self.assertEqual(submit_decision(self.db, KEY, "req-0001", "reply", "  ", now=self.now), "请先写下回复内容")
-        self.assertEqual(submit_decision(self.db, KEY, "unknown-id", "allow", now=self.now), "这个请求已经结束")
+        self.assertEqual(submit_decision(self.db, KEY, "req-0001", "reply", "  ", now=self.now), "Write a reply first.")
+        self.assertEqual(submit_decision(self.db, KEY, "unknown-id", "allow", now=self.now), "This request has already ended.")
         self.assertIsNone(submit_decision(self.db, KEY, "req-0001", "allow", now=self.now))
-        self.assertEqual(submit_decision(self.db, KEY, "req-0001", "deny", now=self.now), "这个请求已经回复过了")
+        self.assertEqual(submit_decision(self.db, KEY, "req-0001", "deny", now=self.now), "This request was already answered.")
 
     def test_questions_accept_only_reply_or_stop(self):
         record_hook(self.db, "Claude", self.event("PreToolUse", tool_name="AskUserQuestion",
                                                   tool_input={"questions": [{"question": "Which port?"}]}),
                     now=self.now, request_id="req-0002", answer_until=self.now + 60)
-        self.assertEqual(submit_decision(self.db, KEY, "req-0002", "allow", now=self.now), "这个请求不支持该操作")
+        self.assertEqual(submit_decision(self.db, KEY, "req-0002", "allow", now=self.now), "That action isn't available for this request.")
         self.assertIsNone(submit_decision(self.db, KEY, "req-0002", "reply", "8080", now=self.now))
 
     def test_hook_output_formats(self):
