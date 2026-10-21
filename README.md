@@ -54,7 +54,14 @@ Launchers are provided for macOS, Linux, and Windows. Desktop links and hook beh
 
 ## Quick start
 
-Download and extract the repository, or clone it with Git. Open the project folder containing `launcher.py` and `requirements.txt`. If you downloaded the larger workspace, this is the `agent-conversation-board` folder.
+Clone the repository, then enter its folder:
+
+```bash
+git clone https://github.com/MengjiaoNan/pigenthub.git
+cd pigenthub
+```
+
+You can also download the source archive from the repository's Code menu and extract it. Run the commands below from the folder containing `launcher.py` and `requirements.txt`.
 
 ### Start the dashboard
 
@@ -174,6 +181,7 @@ Local settings, queued messages, hook events, and summary caches are stored unde
 | No conversations appear | Make sure the agent has saved local sessions. Check `CODEX_HOME` or `CLAUDE_CONFIG_DIR` if you use custom directories. |
 | Approvals do not appear | Check the approval-signal status in the dashboard, install the relevant hooks, complete any required trust step, and reopen the agent session. |
 | A summary or message fails | Confirm the required CLI is available and logged in. Custom executable paths can be set with `BOARD_CLAUDE_CLI` or `BOARD_CODEX_CLI`. |
+| A macOS `.command` launcher reports a permission error | Use `bash ./start-board.sh` from the project folder. To enable the double-click launchers, run `chmod +x 启动看板.command 停止看板.command` once. |
 | The browser does not open | Use the address printed by the launcher. Startup logs are stored in `.board/server.log`. |
 | A copied project fails to start | Create a fresh copy without `.venv/`, then launch it to build an environment for the current machine. |
 
