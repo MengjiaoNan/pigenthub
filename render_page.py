@@ -10,9 +10,9 @@ conversations = json.loads(data_path.read_text(encoding="utf-8"))
 cards = []
 
 for conversation in conversations:
-    title = escape(conversation.get("title") or "未命名对话")
-    project = escape(conversation.get("project") or "未记录项目")
-    source = escape(conversation.get("source") or "未知来源")
+    title = escape(conversation.get("title") or "Untitled conversation")
+    project = escape(conversation.get("project") or "No project recorded")
+    source = escape(conversation.get("source") or "Unknown source")
 
     cards.append(f"""
         <article class="card">
@@ -24,11 +24,11 @@ for conversation in conversations:
 
 page = """
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>我的 Agent 对话看板</title>
+    <title>PigentHub</title>
     <style>
         body {
             font-family: system-ui, sans-serif;
@@ -54,12 +54,12 @@ page = """
     </style>
 </head>
 <body>
-    <h1>我的 Agent 对话看板</h1>
+    <h1>PigentHub</h1>
     <input
         id="search"
         type="search"
-        placeholder="搜索对话标题或项目"
-        aria-label="搜索对话"
+        placeholder="Search conversation titles or projects"
+        aria-label="Search conversations"
     >
     <main>
 """ + "\n".join(cards) + """
@@ -84,4 +84,4 @@ page = """
 output_path = project_dir / "index.html"
 output_path.write_text(page, encoding="utf-8")
 
-print("网页已生成：", output_path)
+print("Page generated: ", output_path)

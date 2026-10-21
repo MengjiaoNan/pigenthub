@@ -98,7 +98,7 @@ def main():
             preview = ROOT / ".board" / (source.lower() + "-observer-config.json")
             preview.parent.mkdir(parents=True, exist_ok=True)
             preview.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            print(source + " 配置预览：" + str(preview))
+            print(source + " configuration preview: " + str(preview))
         return
     for source, path, data in prepared:
         if path.exists():
@@ -106,14 +106,14 @@ def main():
             shutil.copy2(path, backup / (source.lower() + "-" + path.name))
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        print(source + " 监听配置已写入：" + str(path))
+        print(source + " observer configuration saved: " + str(path))
     marker = ROOT / ".board" / "observer-install.json"
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps({"installed_at": datetime.now(timezone.utc).isoformat(), "sources": [s for s, _, _ in prepared]}) + "\n", encoding="utf-8")
     if any(source == "Codex" for source, _, _ in prepared):
-        print("Codex 需要通过 /hooks 审阅并信任新增监听，然后重新打开原会话。")
+        print("In Codex, review and trust the new hooks using /hooks, then reopen the original conversation.")
     if any(source == "Claude" for source, _, _ in prepared):
-        print("已有 Claude 会话可能需要重新打开。")
+        print("You may need to reopen existing Claude conversations.")
 
 
 if __name__ == "__main__":

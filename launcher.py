@@ -67,7 +67,7 @@ class Launcher:
                     if error.errno not in {11, 13, 35, 36}:
                         raise
                     if time.monotonic() >= deadline:
-                        raise LauncherError("另一个启动操作仍在进行，请稍后重试。")
+                        raise LauncherError("Another launch is in progress. Try again shortly.")
                     time.sleep(0.2)
             try:
                 yield
@@ -116,15 +116,15 @@ class Launcher:
     def environment(self):
         python = venv_python(self.root)
         if not python.exists():
-            print("首次启动：正在创建项目运行环境……", flush=True)
+            print("First launch: creating the project environment...", flush=True)
             subprocess.run([sys.executable, "-m", "venv", str(self.root / ".venv")], check=True)
         try:
             check = subprocess.run([str(python), "-I", "-c", "import fastapi, uvicorn"],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError as error:
-            raise LauncherError("项目的 .venv 无法使用。复制项目时请排除 .venv，再重新启动。") from error
+            raise LauncherError("The project .venv is unusable. Copy the project without .venv, then start it again.") from error
         if check.returncode:
-            print("首次启动：正在安装依赖，需要连接网络，请稍候……", flush=True)
+            print("First launch: installing dependencies. An internet connection is required. Please wait...", flush=True)
             subprocess.run([str(python), "-m", "pip", "install", "-r", str(self.root / "requirements.txt")], check=True)
         return python
 
@@ -180,8 +180,8 @@ class Launcher:
                         self.terminate(process)
                 # A different process may have claimed this port after our probe.
                 if self.available(port):
-                    raise LauncherError(f"后台启动失败，请查看日志：{self.log_path}")
-            raise LauncherError("8001–8010 端口均不可用，请关闭占用这些端口的程序后重试。")
+                    raise LauncherError(f"The server failed to start. Check the log: {self.log_path}")
+            raise LauncherError("Ports 8001–8010 are unavailable. Close the programs using them and try again.")
 
     @staticmethod
     def terminate(process):
@@ -199,16 +199,16 @@ class Launcher:
         with self.locked():
             state = self.state()
             if not state:
-                return "没有找到一键启动的后台记录。手动启动的后台请在原终端按 Control+C 停止。"
+                return "No launcher-managed server record was found. For a manually started server, press Control+C in its original terminal."
             health = self.health(state["port"])
             if health is None:
                 # os.kill(pid, 0) terminates a process on Windows. Retain an
                 # unreachable server's record; a later start can replace it.
-                raise LauncherError("暂时无法确认后台状态，已保留启动记录，请稍后重试停止。")
+                raise LauncherError("The server status could not be confirmed. Its launch record was kept; try stopping it again shortly.")
             if not (self.ours(health) and health.get("pid") == state["pid"] and
                     health.get("launch_id") == state["launch_id"]):
                 self.state_path.unlink(missing_ok=True)
-                return "记录中的看板后台已停止，已清理旧的启动记录。"
+                return "The recorded server has stopped. The stale launch record was removed."
             if health.get("launcher_protocol") == 2:
                 request_path = self.directory / ("stop-" + state["launch_id"] + ".request")
                 request_path.touch()
@@ -219,16 +219,16 @@ class Launcher:
                 except ProcessLookupError:
                     pass
             else:
-                raise LauncherError("后台版本较旧，请在其原启动窗口中停止后重新启动。")
+                raise LauncherError("This server uses an older version. Stop it in its original terminal, then restart it.")
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
                 health = self.health(state["port"])
                 if not (self.ours(health) and health.get("launch_id") == state["launch_id"]):
                     self.state_path.unlink(missing_ok=True)
                     (self.directory / ("stop-" + state["launch_id"] + ".request")).unlink(missing_ok=True)
-                    return "看板后台已停止。下次运行启动入口即可恢复。"
+                    return "The server has stopped. Run the start launcher to start it again."
                 time.sleep(0.2)
-            raise LauncherError(f"后台暂未退出，请查看日志：{self.log_path}")
+            raise LauncherError(f"The server has not exited yet. Check the log: {self.log_path}")
 
 
 def serve(port):
@@ -256,7 +256,7 @@ def serve(port):
 def main():
     parser = argparse.ArgumentParser(description=f"{APP_NAME} launcher (macOS / Linux / Windows)")
     parser.add_argument("action", nargs="?", default="start", choices=["start", "stop", "_serve"])
-    parser.add_argument("--no-browser", action="store_true", help="启动后仅显示地址")
+    parser.add_argument("--no-browser", action="store_true", help="Print the address without opening a browser")
     parser.add_argument("--port", type=int, default=8001, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.action == "_serve":
@@ -268,10 +268,10 @@ def main():
             print(launcher.stop())
             return 0
         url, started = launcher.start()
-        print((f"{APP_NAME} 已启动：" if started else f"{APP_NAME} 已在运行：") + url, flush=True)
-        print("后台会继续运行，现在可以关闭这个终端窗口。")
-        entry = "stop-board.bat" if sys.platform == "win32" else "停止看板.command" if sys.platform == "darwin" else "stop-board.sh"
-        print(f"需要停止时，运行「{entry}」。", flush=True)
+        print((f"{APP_NAME} started: " if started else f"{APP_NAME} is already running: ") + url, flush=True)
+        print("The server will keep running. You can close this terminal window.")
+        entry = "stop-board.bat" if sys.platform == "win32" else "stop-board.command" if sys.platform == "darwin" else "stop-board.sh"
+        print(f"To stop the server, run {entry}.", flush=True)
         if not args.no_browser:
             try:
                 headless = sys.platform.startswith("linux") and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
@@ -279,10 +279,10 @@ def main():
             except (OSError, webbrowser.Error):
                 opened = False
             if not opened:
-                print("浏览器未能自动打开，请复制上面的地址。")
+                print("The browser could not be opened automatically. Copy the address above.")
         return 0
     except (LauncherError, OSError, subprocess.SubprocessError) as error:
-        print("启动器提示：" + str(error), file=sys.stderr)
+        print("Launcher: " + str(error), file=sys.stderr)
         return 1
 
 

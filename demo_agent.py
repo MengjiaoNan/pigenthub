@@ -18,35 +18,35 @@ def run_demo(on_event, ask_permission):
             "request": request,
         })
 
-    emit("run_started", "正在分析任务")
+    emit("run_started", "Analyzing the task")
     time.sleep(2)
 
 
     request = {
         "id": str(uuid4()),
-        "summary": "是否允许继续模拟测试？",
+        "summary": "Allow the simulated test to continue?",
         "options": [
-            {"id": "allow_once", "label": "允许本次"},
-            {"id": "deny", "label": "拒绝"},
+            {"id": "allow_once", "label": "Allow once"},
+            {"id": "deny", "label": "Deny"},
         ],
     }
 
-    emit("approval_requested", "等待你处理权限请求", request)
+    emit("approval_requested", "Waiting for your permission", request)
 
     decision = ask_permission(request)
 
     if decision not in {"allow_once", "deny"}:
-        raise ValueError("无法识别的审批选择")
+        raise ValueError("Unrecognized approval choice.")
 
-    emit("approval_resolved", f"用户选择：{decision}", request)
+    emit("approval_resolved", f"User selected: {decision}", request)
 
     if decision == "deny":
-        emit("run_cancelled", "你拒绝了请求，演示已取消")
+        emit("run_cancelled", "You denied the request. The demo was cancelled.")
         return
 
-    emit("activity", "正在模拟运行测试")
+    emit("activity", "Simulating a test run")
     time.sleep(3)
-    emit("run_completed", "模拟测试完成")
+    emit("run_completed", "Simulated test completed")
 
 
 def print_event(event):
@@ -57,14 +57,14 @@ def terminal_permission(request):
     print("\n" + request["summary"])
 
     while True:
-        choice = input("输入 1 允许本次，输入 2 拒绝：").strip()
+        choice = input("Enter 1 to allow once, or 2 to deny: ").strip()
 
         if choice == "1":
             return "allow_once"
         if choice == "2":
             return "deny"
 
-        print("请输入 1 或 2。")
+        print("Enter 1 or 2.")
 
 
 if __name__ == "__main__":

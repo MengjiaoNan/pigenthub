@@ -83,7 +83,7 @@ def read_titles(codex_home: Path, warnings: list[str]) -> dict[str, dict]:
                 if isinstance(row, dict) and isinstance(row.get("id"), str):
                     titles[row["id"]] = row
     except OSError:
-        warnings.append("标题索引无法读取，改用首条用户请求。")
+        warnings.append("The title index could not be read. Using the first user request instead.")
     return titles
 
 
@@ -136,7 +136,7 @@ def read_session(path: Path, titles: dict[str, dict]) -> Optional[Conversation]:
     return Conversation(
         source="Codex",
         conversation_id=conversation_id,
-        title=title or first_request[:100] or "未命名对话",
+        title=title or first_request[:100] or "Untitled conversation",
         project=project if isinstance(project, str) else "",
         updated_at=datetime.fromtimestamp(updated, timezone.utc).isoformat(),
         message_count=(user_messages or event_user_messages) + assistant_messages,
@@ -148,14 +148,14 @@ def scan_sessions(codex_home: Path) -> tuple[list[Conversation], list[str]]:
     warnings = []
     folder = codex_home / "sessions"
     if not folder.is_dir():
-        return [], ["没有找到 Codex 会话目录：" + str(folder)]
+        return [], ["Codex conversation directory not found: " + str(folder)]
     titles = read_titles(codex_home, warnings)
     conversations = {}
     for path in folder.rglob("*.jsonl"):
         try:
             conversation = read_session(path, titles)
         except OSError:
-            warnings.append("有一份记录无法读取：" + path.name)
+            warnings.append("A record could not be read: " + path.name)
             continue
         if conversation is not None:
             previous = conversations.get(conversation.conversation_id)
@@ -167,18 +167,18 @@ def scan_sessions(codex_home: Path) -> tuple[list[Conversation], list[str]]:
 def positive_integer(value: str) -> int:
     number = int(value)
     if number < 1:
-        raise argparse.ArgumentTypeError("请输入大于 0 的整数")
+        raise argparse.ArgumentTypeError("Enter an integer greater than 0.")
     return number
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="只读查看 Codex 本地对话列表")
-    parser.add_argument("--limit", type=positive_integer, default=10, help="显示数量（默认 10）")
-    parser.add_argument("--search", default="", help="按标题或项目路径搜索")
-    parser.add_argument("--json", action="store_true", help="输出 JSON，便于以后接网页")
+    parser = argparse.ArgumentParser(description="List local Codex conversations without modifying them")
+    parser.add_argument("--limit", type=positive_integer, default=10, help="Number of conversations to show (default: 10)")
+    parser.add_argument("--search", default="", help="Search by title or project path")
+    parser.add_argument("--json", action="store_true", help="Output JSON for use by other tools")
     parser.add_argument("--codex-home", type=Path,
                         default=Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex"))),
-                        help="Codex 数据目录（默认 CODEX_HOME 或 ~/.codex）")
+                        help="Codex data directory (default: CODEX_HOME or ~/.codex)")
     args = parser.parse_args()
     conversations, warnings = scan_sessions(args.codex_home.expanduser())
     query = args.search.casefold()
@@ -186,22 +186,22 @@ def main() -> None:
                if query in item.title.casefold() or query in item.project.casefold()]
     selected = matched[:args.limit]
     for warning in warnings:
-        print("提示：" + warning, file=sys.stderr)
+        print("Note: " + warning, file=sys.stderr)
     if args.json:
         print(json.dumps({"total": len(conversations), "matched": len(matched),
                           "conversations": [asdict(item) for item in selected]},
                          ensure_ascii=False, indent=2))
         return
-    print("共读取 {} 条 Codex 对话，匹配 {} 条，显示 {} 条。\n".format(
+    print("Read {} Codex conversations; {} matched; showing {}.\n".format(
         len(conversations), len(matched), len(selected)))
     for number, item in enumerate(selected, 1):
         updated = datetime.fromisoformat(item.updated_at).astimezone().strftime("%Y-%m-%d %H:%M %Z")
         print("{}. {}".format(number, item.title[:100]))
-        print("   项目：" + (clean_text(item.project) or "未记录"))
-        print("   更新：{} | 消息：{} | 来源：{}".format(updated, item.message_count, item.source))
-        print("   ID：" + clean_text(item.conversation_id) + "\n")
+        print("   Project: " + (clean_text(item.project) or "Not recorded"))
+        print("   Updated: {} | Messages: {} | Source: {}".format(updated, item.message_count, item.source))
+        print("   ID: " + clean_text(item.conversation_id) + "\n")
     if not selected:
-        print("没有匹配的对话。可以调整搜索词或检查 --codex-home。")
+        print("No matching conversations. Adjust the search term or check --codex-home.")
 
 
 if __name__ == "__main__":

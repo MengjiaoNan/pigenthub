@@ -21,8 +21,8 @@ QUESTION_TOOLS = {"AskUserQuestion", "request_user_input"}
 CLEAR_EVENTS = {"UserPromptSubmit", "Stop", "SessionEnd", "Interrupt"}
 ACTIONS = {"permission": {"allow", "deny", "reply", "stop"}, "question": {"reply", "stop"}}
 ANSWER_EVENTS = {
-    "allow": "你在看板允许了本次请求", "deny": "你在看板拒绝了本次请求",
-    "reply": "你在看板回复了：", "stop": "你在看板中止了本轮",
+    "allow": "You allowed this request on the board", "deny": "You denied this request on the board",
+    "reply": "You replied on the board: ", "stop": "You stopped this turn on the board",
 }
 
 
@@ -139,20 +139,20 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
         if kind == "PreCompact":
             # Compaction can occur while another tool still needs approval.
             state["compaction"] = {"started_at": now, "turn_id": payload.get("turn_id")}
-            description = "正在压缩上下文"
+            description = "Compacting context"
         elif kind == "PostCompact":
             current = state.get("compaction") or {}
             if not (current.get("turn_id") and payload.get("turn_id") and current["turn_id"] != payload["turn_id"]):
                 state.pop("compaction", None)
-            description = "上下文压缩已完成"
+            description = "Context compaction completed"
         elif kind == "SessionStart":
             # Resume/reconnect is not evidence that a pending request ended.
             state.pop("compaction", None)
-            description = "会话状态已更新"
+            description = "Conversation updated"
         elif kind in CLEAR_EVENTS:
             state.pop("compaction", None)
             pending.clear()
-            description = {"Stop": "本轮停止通知", "Interrupt": "已中止", "SessionEnd": "会话已关闭"}.get(kind, "会话状态已更新")
+            description = {"Stop": "Agent finished responding", "Interrupt": "Interrupted", "SessionEnd": "Conversation closed"}.get(kind, "Conversation updated")
         elif kind in {"PostToolUse", "PostToolUseFailure"}:
             state.pop("compaction", None)
             digest = fingerprint(payload)
@@ -163,7 +163,7 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
                 if p in pending:
                     pending.remove(p)
             if matching or generic:
-                description = "工具已返回结果，清除对应的等待提示"
+                description = "Tool result received · request resolved"
         else:
             state.pop("compaction", None)
             data = payload.get("tool_input")
@@ -171,10 +171,10 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
             question = kind == "PreToolUse" or notification in {"elicitation_dialog", "elicitation_url_dialog"}
             reason = data.get("description") or data.get("justification") or payload.get("message")
             if question and isinstance(data.get("questions"), list):
-                reason = "；".join(str(q.get("question", "")) for q in data["questions"] if isinstance(q, dict))
+                reason = "; ".join(str(q.get("question", "")) for q in data["questions"] if isinstance(q, dict))
             if not reason and isinstance(data.get("command"), str):
-                reason = tool + "：" + data["command"]
-            reason = str(reason or ((tool or source) + (" 等待你回答" if question else " 请求权限审批")))[:240]
+                reason = tool + ": " + data["command"]
+            reason = str(reason or ((tool or source) + (" is waiting for your answer" if question else " needs permission")))[:240]
             generic = kind == "Notification"
             # Notification often repeats an already observed PermissionRequest.
             if not (generic and pending):
@@ -185,7 +185,7 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
                                 "turn_id": payload.get("turn_id"),
                                 "fingerprint": digest, "received_at": now, "generic": generic,
                                 "request_id": request_id, "answer_until": answer_until if request_id else None})
-            description = "等待回答：" + reason if question else "发起审批：" + reason
+            description = "Waiting for an answer: " + reason if question else "Approval requested: " + reason
         state["last_event"], state["last_seen"] = kind, now
         if description:
             state["events"].append({"message": description, "timestamp": stamp(now)})
@@ -198,23 +198,23 @@ def submit_decision(path, key, request_id, action, message="", now=None):
     now = time() if now is None else now
     message = (message or "").strip()[:4000]
     if action == "reply" and not message:
-        return "请先写下回复内容"
+        return "Write a reply first."
     path = Path(path)
     if not path.exists():
-        return "这个请求已经结束"
+        return "This request has already ended."
     with closing(connect(path, timeout=2)) as db, db:
         db.execute("BEGIN IMMEDIATE")
         row = db.execute("SELECT source FROM live_sessions WHERE id=?", (key,)).fetchone()
         state = load_state(db, key)
         entry = next((p for p in state["pending"] if request_id and p.get("request_id") == request_id), None)
         if row is None or entry is None:
-            return "这个请求已经结束"
+            return "This request has already ended."
         if action not in ACTIONS.get(entry["kind"], set()):
-            return "这个请求不支持该操作"
+            return "That action isn't available for this request."
         if db.execute("SELECT 1 FROM decisions WHERE request_id=?", (request_id,)).fetchone():
-            return "这个请求已经回复过了"
+            return "This request was already answered."
         if not entry.get("answer_until") or entry["answer_until"] < now:
-            return "已超过看板作答时间，请到原应用处理"
+            return "Time's up for answering here. Please answer in the agent app."
         db.execute("DELETE FROM decisions WHERE created < ?", (now - 86400,))
         db.execute("INSERT INTO decisions VALUES (?, ?, ?, ?, ?)", (request_id, key, action, message, now))
         entry["answer_until"], entry["answered"] = None, action
@@ -245,7 +245,7 @@ def take_decision(path, key, request_id, give_up=False, now=None):
         else:
             if entry:
                 entry["answer_until"], entry["handed_back"] = None, True
-            text = "看板未在时限内作答，已转回原应用处理"
+            text = "No answer on the board in time · handed back to the agent app"
         state["events"].append({"message": text, "timestamp": stamp(now)})
         if row:
             save_state(db, key, row[0], state, now)
@@ -335,11 +335,11 @@ class LiveEventStore:
             if now - compact_at <= COMPACTION_WINDOW:
                 if card["status"] in {"done", "cancelled", "failed"} or not card.get("started_at"):
                     card["started_at"] = stamp(compact_at)
-                card.update(status="running", status_reason="正在压缩上下文", activity_phase="compacting",
+                card.update(status="running", status_reason="Compacting context", activity_phase="compacting",
                             finished_at=None, activity_at=stamp(compact_at))
                 card["updated_at"] = max(card.get("updated_at") or "", stamp(compact_at))
             else:
-                card.update(status="unknown", status_reason="上下文压缩长时间没有后续事件，请查看原应用")
+                card.update(status="unknown", status_reason="No follow-up after context compaction. Check the agent app.")
         pending = [p for p in state.get("pending", []) if p["received_at"] >= max(terminal, started)]
         requests = []
         for p in pending:
@@ -353,12 +353,12 @@ class LiveEventStore:
         if pending:
             newest = max(p["received_at"] for p in pending)
             if now - newest > PENDING_WINDOW:
-                card["status"], card["status_reason"] = "unknown", "之前收到过审批 / 回答请求，等待状态已过期，请查看原应用"
+                card["status"], card["status_reason"] = "unknown", "The previous request is stale. Check the original app for its current status."
             elif any(r["answered"] for r in requests):
-                card["status"], card["status_reason"] = "needs_you", "已在看板回复，等待 Agent 继续"
+                card["status"], card["status_reason"] = "needs_you", "Answer sent. Waiting for the agent to continue."
             elif any(r["answerable"] for r in requests):
-                card["status"], card["status_reason"] = "needs_you", "可以直接在卡片里回复；超时后转回原应用处理"
+                card["status"], card["status_reason"] = "needs_you", "Answer right here on the card. If the timer runs out, the request moves back to the agent app."
             else:
                 card["status"] = "needs_you"
-                card["status_reason"] = "已检测到审批或回答请求，请到原应用处理；处理后随工具结果更新"
+                card["status_reason"] = "Waiting for your approval or answer in the original app. Updates when the tool returns."
         return card

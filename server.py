@@ -47,7 +47,7 @@ async def only_this_page_can_act(request: Request, call_next):
     host = (request.headers.get("host") or "").rsplit(":", 1)[0]
     acting = request.method not in {"GET", "HEAD", "OPTIONS"}
     if host not in {"127.0.0.1", "localhost"} or (acting and request.headers.get(ACTION_HEADER) != "1"):
-        return JSONResponse({"detail": "只接受来自本机看板页面的操作"}, status_code=403)
+        return JSONResponse({"detail": "Only this board page can do that."}, status_code=403)
     return await call_next(request)
 
 
@@ -76,7 +76,7 @@ def get_conversations():
 def get_conversation(conversation_id: str, full: bool = False):
     conversation = store.detail(conversation_id, full=full)
     if conversation is None:
-        raise HTTPException(404, "这段会话已不在本地记录中")
+        raise HTTPException(404, "This conversation is no longer available in the local records.")
     conversation["outbox"] = live_events.outbox(conversation_id)
     return with_send_state(conversation)
 
@@ -84,7 +84,7 @@ def get_conversation(conversation_id: str, full: bool = False):
 @app.delete("/api/conversations/{conversation_id}/outbox/{message_id}")
 def cancel_message(conversation_id: str, message_id: int):
     if not live_events.cancel(conversation_id, message_id):
-        raise HTTPException(409, "这条消息已经送达，无法取消")
+        raise HTTPException(409, "That message was already delivered.")
     return {"ok": True}
 
 
@@ -100,7 +100,7 @@ def get_progress(conversation_id: str):
 def get_workflow(conversation_id: str):
     workflow = store.workflow(conversation_id)
     if workflow is None:
-        raise HTTPException(404, "这段会话已不在本地记录中")
+        raise HTTPException(404, "This conversation is no longer available in the local records.")
     return workflow
 
 
@@ -128,7 +128,7 @@ def send_message(conversation_id: str, message: NewMessage):
         raise HTTPException(422, "Write a message first.")
     card = store.detail(conversation_id)
     if card is None:
-        raise HTTPException(404, "这段会话已不在本地记录中")
+        raise HTTPException(404, "This conversation is no longer available in the local records.")
     if card["status"] in {"running", "needs_you"}:
         # Hand off as hook context. This is not a desktop UI delivery acknowledgement.
         listener = next((item for item in live_events.listeners(live_events.snapshot())
@@ -179,7 +179,7 @@ def generate_summary(conversation_id: str, request: SummaryRequest):
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
     if card is None:
-        raise HTTPException(404, "这段会话已不在本地记录中")
+        raise HTTPException(404, "This conversation is no longer available in the local records.")
     return card
 
 

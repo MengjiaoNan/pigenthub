@@ -39,7 +39,7 @@ def save_settings(root, values):
     wait = values.get("approval_wait_seconds")
     if wait is not None:
         if wait not in WAIT_CHOICES:
-            raise ValueError("不支持这个等待时长")
+            raise ValueError("This wait duration is not supported.")
         settings["approval_wait_seconds"] = wait
     write_json(board_dir(root) / "settings.json", settings)
     return settings
@@ -57,7 +57,7 @@ def save_focus(root, ids):
         if isinstance(item, str) and item.strip() and item.strip() not in clean:
             clean.append(item.strip()[:200])
     if len(clean) > FOCUS_LIMIT:
-        raise ValueError(f"最多关注 {FOCUS_LIMIT} 个对话")
+        raise ValueError(f"You can focus on up to {FOCUS_LIMIT} conversations.")
     write_json(board_dir(root) / "focus.json", {"conversations": clean})
     return clean
 

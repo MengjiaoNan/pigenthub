@@ -47,7 +47,7 @@ def codex_command(executable=None):
         name = "codex.exe" if sys.platform == "win32" else "codex"
         bundled = agent_home("Codex") / "plugins/.plugin-appserver/codex-cli/bin" / name
         if not bundled.is_file():
-            raise RuntimeError("找不到 Codex CLI，请安装 Codex，或用 BOARD_CODEX_CLI 指定路径")
+            raise RuntimeError("Codex CLI was not found. Install Codex or set its path with BOARD_CODEX_CLI.")
         candidate = str(bundled)
     return [str(Path(candidate).expanduser())]
 
@@ -64,5 +64,5 @@ def claude_command(executable=None):
         node = shutil.which("node")
         if entry.is_file() and node:
             return [node, str(entry)]
-        raise RuntimeError("请安装原生 Claude Code CLI，或用 BOARD_CLAUDE_CLI 指定 claude.exe 路径")
+        raise RuntimeError("Install the native Claude Code CLI or set the claude.exe path with BOARD_CLAUDE_CLI.")
     return [str(path)]

@@ -67,7 +67,7 @@ You can also download the source archive from the repository's Code menu and ext
 
 | Platform | Start | Stop |
 | --- | --- | --- |
-| macOS | Run `bash ./start-board.sh`, or double-click `启动看板.command` | Run `bash ./stop-board.sh`, or double-click `停止看板.command` |
+| macOS | Run `bash ./start-board.sh`, or double-click `start-board.command` | Run `bash ./stop-board.sh`, or double-click `stop-board.command` |
 | Linux | Run `bash ./start-board.sh` | Run `bash ./stop-board.sh` |
 | Windows | Double-click `start-board.bat` | Double-click `stop-board.bat` |
 
@@ -161,7 +161,7 @@ PigentHub serves the dashboard on your own machine and reads local conversation 
 | View an already cached summary | No additional model call |
 | Send a message or let an agent continue after your response | Uses the corresponding agent's normal model quota |
 
-Summaries are generated only when you request them. They currently use the Claude Code `haiku` model alias and produce **Chinese text**. The full original reply remains available. The model can be changed with `BOARD_SUMMARY_MODEL`.
+Summaries are generated only when you request them. They currently use the Claude Code `haiku` model alias and produce **English text**. The full original reply remains available. The model can be changed with `BOARD_SUMMARY_MODEL`.
 
 Local settings, queued messages, hook events, and summary caches are stored under `.board/`. Share source files when distributing the project; keep your conversation exports, `.board/`, and `.venv/` private. These generated files and folders are covered by the project's `.gitignore`.
 
@@ -183,7 +183,7 @@ Local settings, queued messages, hook events, and summary caches are stored unde
 | No conversations appear | Make sure the agent has saved local sessions. Check `CODEX_HOME` or `CLAUDE_CONFIG_DIR` if you use custom directories. |
 | Approvals do not appear | Check the approval-signal status in the dashboard, install the relevant hooks, complete any required trust step, and reopen the agent session. |
 | A summary or message fails | Confirm the required CLI is available and logged in. Custom executable paths can be set with `BOARD_CLAUDE_CLI` or `BOARD_CODEX_CLI`. |
-| A macOS `.command` launcher reports a permission error | Use `bash ./start-board.sh` from the project folder. To enable the double-click launchers, run `chmod +x 启动看板.command 停止看板.command` once. |
+| A macOS `.command` launcher reports a permission error | Use `bash ./start-board.sh` from the project folder. To enable the double-click launchers, run `chmod +x start-board.command stop-board.command` once. |
 | The browser does not open | Use the address printed by the launcher. Startup logs are stored in `.board/server.log`. |
 | A copied project fails to start | Create a fresh copy without `.venv/`, then launch it to build an environment for the current machine. |
 

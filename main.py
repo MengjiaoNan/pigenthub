@@ -61,7 +61,7 @@ def read_conversation(file_path):
     return {
         "source": "Codex",
         "id": metadata.get("id"),
-        "title": user_question.replace("\n", " ")[:50] or "未命名对话",
+        "title": user_question.replace("\n", " ")[:50] or "Untitled conversation",
         "project": metadata.get("cwd"),
     }
 
@@ -92,7 +92,7 @@ for file_path in session_files:
     try:
         conversation = read_conversation(file_path)
     except (OSError, json.JSONDecodeError) as error:
-        print("跳过文件：", file_path.name, "原因：", error)
+        print("Skipped file: ", file_path.name, "Reason: ", error)
         continue
 
     if conversation is None:
@@ -101,8 +101,8 @@ for file_path in session_files:
 
     conversations.append(conversation)
 
-print("成功读取的对话数量：", len(conversations))
-print("\n前 5 张卡片：")
+print("Conversations read: ", len(conversations))
+print("\nFirst 5 cards:")
 print(json.dumps(conversations[:5], ensure_ascii=False, indent=2))
 output_path = Path(__file__).parent / "conversations.json"
 
@@ -111,4 +111,4 @@ output_path.write_text(
     encoding="utf-8",
 )
 
-print("\n卡片已保存到：", output_path)
+print("\nCards saved to: ", output_path)

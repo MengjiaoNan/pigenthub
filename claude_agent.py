@@ -21,7 +21,7 @@ def run_claude(on_event, prompt):
             "request": None,
         })
 
-    emit("run_started", "正在等待 Claude Code 回复")
+    emit("run_started", "Waiting for Claude Code to respond")
 
     process = subprocess.run(
         [
@@ -41,16 +41,16 @@ def run_claude(on_event, prompt):
 
     if process.returncode != 0:
         error = process.stderr.strip() or process.stdout.strip()
-        raise RuntimeError(error or "Claude Code 调用失败")
+        raise RuntimeError(error or "Claude Code failed.")
 
     result = json.loads(process.stdout)
 
     if result.get("is_error"):
-        raise RuntimeError(result.get("result") or "Claude 返回错误")
+        raise RuntimeError(result.get("result") or "Claude returned an error.")
 
     reply = result.get("result")
     if not isinstance(reply, str) or not reply.strip():
-        raise RuntimeError("Claude 没有返回文字回复")
+        raise RuntimeError("Claude did not return a text reply.")
 
     session_id = result.get("session_id")
     emit("run_completed", reply)

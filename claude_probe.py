@@ -3,13 +3,13 @@ import subprocess
 from pathlib import Path
 from platform_support import claude_command
 
-print("正在连接 Claude Code，请稍等……")
+print("Connecting to Claude Code. Please wait...")
 
 try:
     process = subprocess.run(
         [
             *claude_command(),
-            "-p", "请只回复：工作台连接成功",
+            "-p", "Reply with only: Workbench connection successful",
             "--output-format", "json",
             "--tools", "",
             "--disallowedTools", "mcp__*",
@@ -23,21 +23,21 @@ try:
     )
 
     if process.returncode != 0:
-        print("调用失败：")
+        print("Call failed:")
         print(process.stdout)
         print(process.stderr)
     else:
         result = json.loads(process.stdout)
         if result.get("is_error"):
-            print("Claude 返回错误：", result.get("result"))
+            print("Claude returned an error:", result.get("result"))
         else:
-            print("Claude 回复：", result.get("result"))
-            print("对话 ID：", result.get("session_id"))
+            print("Claude reply:", result.get("result"))
+            print("Conversation ID:", result.get("session_id"))
 
 except subprocess.TimeoutExpired:
-    print("等待超过 120 秒，本次测试已停止。")
+    print("Stopped this connection test after waiting for 120 seconds.")
 except FileNotFoundError:
-    print("找不到 Claude Code，请检查安装路径。")
+    print("Claude Code was not found. Check its installation path.")
 except json.JSONDecodeError:
-    print("返回内容不是预期的 JSON：")
+    print("The response was not valid JSON:")
     print(process.stdout)

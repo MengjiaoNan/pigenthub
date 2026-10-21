@@ -23,7 +23,7 @@ def resume_command(source, session_id):
         return [*claude_command(), "-p", "--resume", session_id, "--output-format", "json"]
     if source == "Codex":
         return [*codex_command(), "exec", "resume", "--skip-git-repo-check", session_id, "-"]
-    raise ValueError("暂不支持这个来源")
+    raise ValueError("This source is not supported.")
 
 
 class AgentRunner:
@@ -40,14 +40,14 @@ class AgentRunner:
     def send(self, key, source, session_id, project, text):
         text = (text or "").strip()
         if not text:
-            raise ValueError("请先写下要发送的内容")
+            raise ValueError("Write a message first.")
         if len(text) > MESSAGE_LIMIT:
-            raise ValueError("内容太长，请分几次发送")
+            raise ValueError("This message is too long. Send it in smaller parts.")
         command = resume_command(source, session_id)
         folder = Path(project) if project and Path(project).is_dir() else Path.home()
         with self.lock:
             if self.runs.get(key, {}).get("state") == "sending":
-                raise ValueError("上一条消息还在处理中")
+                raise ValueError("Your previous message is still being processed.")
             self.runs[key] = {"state": "sending", "started_at": time(), "error": None}
         Thread(target=self._run, args=(key, command, folder, text), daemon=True,
                name="board-send-" + key).start()
@@ -65,11 +65,11 @@ class AgentRunner:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.communicate()
-                raise RuntimeError("运行超过 1 小时，已停止") from None
+                raise RuntimeError("Stopped after exceeding the one-hour runtime limit.") from None
             if process.returncode:
-                error = (stderr or stdout or "").strip()[-400:] or "Agent 返回了错误"
+                error = (stderr or stdout or "").strip()[-400:] or "The agent returned an error."
         except Exception as exc:
-            error = str(exc) or "发送失败"
+            error = str(exc) or "Failed to send the message."
         with self.lock:
             self.runs[key] = {"state": "error" if error else "sent", "started_at": self.runs[key]["started_at"],
                               "finished_at": time(), "error": error}

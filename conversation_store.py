@@ -45,7 +45,7 @@ def request_text(text):
         text = re.sub(rf"<{tag}\b[^>]*>.*?</{tag}>", "", text, flags=re.S)
     if "## My request:" in text:
         text = text.split("## My request:", 1)[1]
-    return re.sub(r"<image\b[^>]*>", "[图片]", text).strip()
+    return re.sub(r"<image\b[^>]*>", "[Image]", text).strip()
 
 
 def preview(text, limit=180):
@@ -77,7 +77,7 @@ class Transcript:
         self.messages, self.events = [], []
         self.message_count = 0
         self.status = "unknown"
-        self.reason = "本地记录没有可确认的运行状态"
+        self.reason = "No confirmed runtime status is available in the local record."
         self.started_at = self.finished_at = self.observed_at = self.updated_at = None
         self.activity_at = None
         self.turn_id = None
@@ -100,7 +100,7 @@ class Transcript:
         if self.messages and self.messages[-1]["role"] == role and self.messages[-1]["text"] == text:
             return
         if role == "user" and self.status in {"done", "cancelled", "failed"}:
-            self.status, self.reason = "unknown", "已有新消息，尚未读到本轮开始事件"
+            self.status, self.reason = "unknown", "New message received. Waiting for this turn to start."
             self.started_at = self.finished_at = None
         self.message_count += 1
         self.messages.append({"role": role, "text": text, "timestamp": iso(at) if at else None})
@@ -122,18 +122,18 @@ class Transcript:
         if status == "running" and (self.activity_at is None or now - self.activity_at > ACTIVE_WINDOW):
             if self.source == "Codex" and self.started_at is not None:
                 # A quiet tool or approval wait does not end an explicit turn.
-                reason = "本轮尚未结束，正在等待新的进展"
+                reason = "This turn is still open. Waiting for an update."
             else:
-                status, reason = "unknown", "最后记录是运行中，但近期没有新事件；无法确认是否仍在工作"
+                status, reason = "unknown", "No recent activity. The last running status is unconfirmed."
         latest = self.messages[-1] if self.messages else None
         excerpt = latest["text"] if latest else ""
-        kind = "任务摘录" if latest and latest["role"] == "user" else "回复摘录"
+        kind = "Task excerpt" if latest and latest["role"] == "user" else "Reply excerpt"
         if latest and latest["role"] == "assistant" and status == "running":
-            kind = "最新进展摘录"
+            kind = "Progress excerpt"
         return {
             "id": self.source.lower() + ":" + self.session_id,
             "session_id": self.session_id, "source": self.source,
-            "title": self.title or "未命名对话", "project": self.project,
+            "title": self.title or "Untitled conversation", "project": self.project,
             "status": status, "status_reason": reason,
             "updated_at": iso(self.updated_at) if self.updated_at else None,
             "observed_at": iso(self.observed_at) if self.observed_at else None,
@@ -141,7 +141,7 @@ class Transcript:
             "started_at": iso(self.started_at) if self.started_at else None,
             "finished_at": iso(self.finished_at) if self.finished_at else None,
             "message_count": self.message_count,
-            "preview": preview(excerpt) or "尚无文字回复",
+            "preview": preview(excerpt) or "No reply yet",
             "preview_kind": kind,
         }
 
@@ -163,31 +163,31 @@ def read_codex(path, message_limit=MESSAGE_LIMIT):
             result.session_id, result.project = p.get("id", ""), p.get("cwd", "")
         elif row.get("type") == "compacted":
             # This record is written after compaction, never a start signal.
-            result.event("上下文压缩已完成", at)
+            result.event("Context compaction completed", at)
             if result.status == "running":
-                result.reason = "上下文压缩已完成，继续处理本轮"
+                result.reason = "Context compacted. Continuing this turn."
         elif row.get("type") == "response_item":
             if kind == "message" and p.get("role") in {"user", "assistant"}:
                 role, text = p["role"], text_blocks(p.get("content"))
                 result.message(role, request_text(text) if role == "user" else text, at)
             elif kind in {"function_call", "custom_tool_call"}:
-                result.event("调用工具 · " + str(p.get("name", "工具")), at)
+                result.event("Tool call · " + str(p.get("name", "Tool")), at)
             elif kind in {"function_call_output", "custom_tool_call_output"}:
-                result.event("工具执行结果已写入", at)
+                result.event("Tool result received", at)
         elif row.get("type") == "event_msg":
             if kind == "task_started":
                 result.turn_id = p.get("turn_id")
                 result.started_at = seconds(p.get("started_at")) or at
-                result.mark("running", "已读到本轮开始事件", at)
+                result.mark("running", "This turn has started.", at)
             elif kind in {"task_complete", "turn_aborted"}:
                 if result.turn_id and p.get("turn_id") and result.turn_id != p["turn_id"]:
                     continue
                 if kind == "task_complete":
                     if isinstance(p.get("last_agent_message"), str):
                         result.message("assistant", p["last_agent_message"], at)
-                    result.mark("done", "已读到本轮完成事件", at)
+                    result.mark("done", "This turn has completed.", at)
                 else:
-                    result.mark("cancelled", "本轮已中止", at)
+                    result.mark("cancelled", "This turn was interrupted.", at)
                 result.started_at = seconds(p.get("started_at")) or result.started_at
                 result.finished_at = seconds(p.get("completed_at")) or at
             elif kind == "user_message" and isinstance(p.get("message"), str):
@@ -195,14 +195,14 @@ def read_codex(path, message_limit=MESSAGE_LIMIT):
                 if text:
                     event_messages.append(("user", text, at))
                     if result.status in {"done", "cancelled", "failed"}:
-                        result.status, result.reason = "unknown", "已有新消息，等待本轮状态事件"
+                        result.status, result.reason = "unknown", "New message received. Waiting for a confirmed turn status."
                         result.started_at = result.finished_at = None
             elif kind == "agent_message" and isinstance(p.get("message"), str):
                 event_messages.append(("assistant", p["message"], at))
             elif kind == "context_compacted":
-                result.event("上下文压缩已完成", at)
+                result.event("Context compaction completed", at)
                 if result.status == "running":
-                    result.reason = "上下文压缩已完成，继续处理本轮"
+                    result.reason = "Context compacted. Continuing this turn."
     present_roles = {m["role"] for m in result.messages}
     missing = [m for m in event_messages if m[0] not in present_roles]
     if missing:
@@ -262,27 +262,27 @@ def read_claude(path, message_limit=MESSAGE_LIMIT):
             if row.get("isMeta"):
                 continue
             if "[Request interrupted by user" in text:
-                result.mark("cancelled", "用户已中止本轮", at)
+                result.mark("cancelled", "You interrupted this turn.", at)
                 continue
             if text:
                 result.message("user", request_text(text), at)
                 result.started_at, result.finished_at = at, None
-                result.status, result.reason = "unknown", "已有用户消息，等待可确认的执行记录"
+                result.status, result.reason = "unknown", "Message received. Waiting for recorded activity."
             for block in blocks:
                 if isinstance(block, dict) and block.get("type") == "tool_result":
-                    result.event("工具执行结果已写入", at)
+                    result.event("Tool result received", at)
         else:
             result.message("assistant", text, at)
             tools = [b for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
             if tools:
                 for block in tools:
-                    result.event("调用工具 · " + str(block.get("name", "工具")), at)
-                result.status, result.reason, result.observed_at = "running", "最近记录显示 Agent 正在调用工具", at
+                    result.event("Tool call · " + str(block.get("name", "Tool")), at)
+                result.status, result.reason, result.observed_at = "running", "The latest activity is a tool call.", at
                 result.finished_at = None
             elif message.get("stop_reason") == "end_turn":
-                result.mark("done", "已读到 Claude 本轮回复结束标记", at)
+                result.mark("done", "Claude has finished this turn.", at)
             elif text:
-                result.status, result.reason, result.observed_at = "running", "正在生成回复，尚未读到结束标记", at
+                result.status, result.reason, result.observed_at = "running", "A reply is in progress. No completion recorded yet.", at
                 result.finished_at = None
     result.title = custom_title or result.title
     return result if isinstance(result.session_id, str) and result.session_id and result.messages else None
@@ -327,7 +327,7 @@ class ConversationStore:
             try:
                 available = folder.is_dir()
                 if not available:
-                    warnings.append(source + " 本地会话目录尚不存在")
+                    warnings.append(source + ": no local conversations found yet.")
                 else:
                     for path in folder.rglob("*.jsonl"):
                         if source == "Claude" and ("subagents" in path.parts or path.name.startswith("agent-")):
@@ -335,7 +335,7 @@ class ConversationStore:
                         paths.append((path, reader))
                         count += 1
             except OSError:
-                warnings.append(source + " 会话目录暂时无法读取")
+                warnings.append(source + ": local conversations are temporarily unavailable.")
             sources.append({"name": source, "file_count": count, "available": available})
         titles = read_titles(self.codex_home, warnings)
         current, sessions = {}, {}
@@ -357,7 +357,7 @@ class ConversationStore:
                 if previous is None or (transcript.updated_at or 0) > (previous.updated_at or 0):
                     sessions[key] = transcript
             except (OSError, ValueError, TypeError, KeyError, OverflowError):
-                warnings.append("有一份本地记录暂时无法解析：" + path.name)
+                warnings.append("A local record could not be read: " + path.name)
         self.cache, self.sessions, self.warnings = current, sessions, warnings
         self.sources, self.last_scan, self.scanned_at = sources, now, iso(now)
 
@@ -432,9 +432,9 @@ class ConversationStore:
                 return None
             latest = item.messages[-1] if item.messages else None
             if not self.summaries or not latest or latest["role"] != "assistant":
-                raise ValueError("当前没有可生成摘要的回复")
+                raise ValueError("There is no reply available to summarize.")
             if self.summaries.key(latest["text"]) != reply_key:
-                raise ValueError("回复已更新，请刷新后再选择生成摘要")
+                raise ValueError("The reply has changed. Refresh before requesting a summary.")
             if self.card(item)["status"] in {"running", "needs_you"}:
-                raise ValueError("请等本轮结束后，再选择生成摘要")
+                raise ValueError("Wait for this turn to finish before requesting a summary.")
             return self.card(item, request=True, retry=retry)
