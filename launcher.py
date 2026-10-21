@@ -159,13 +159,16 @@ class Launcher:
                     healthy = False
                     while time.monotonic() < deadline and process.poll() is None:
                         health = self.health(port)
-                        if (self.ours(health) and health.get("pid") == process.pid and
-                                health.get("launch_id") == launch_id):
+                        # Windows venv executables can be redirector processes.
+                        # The per-launch nonce identifies the server they start;
+                        # its reported PID may differ from Popen.pid.
+                        if (self.ours(health) and health.get("launch_id") == launch_id and
+                                type(health.get("pid")) is int and health["pid"] > 0):
                             healthy = True
                             break
                         time.sleep(0.2)
                     if healthy:
-                        state = {"pid": process.pid, "port": port, "launch_id": launch_id,
+                        state = {"pid": health["pid"], "port": port, "launch_id": launch_id,
                                  "instance_id": self.identity, "started_at": time.time()}
                         temporary = self.state_path.with_suffix(".tmp")
                         temporary.write_text(json.dumps(state) + "\n", encoding="utf-8")

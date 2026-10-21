@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 import shlex
 import shutil
+import subprocess
 import sys
 from platform_support import agent_home, hook_references, venv_python
 
@@ -34,11 +35,19 @@ def observer_handler(source, platform=None, root=ROOT, interpreter=None, script_
         return {"type": "command", "command": python, "args": args,
                 "timeout": timeout, "onFailure": "continue"}
     # A shell-neutral outer command works through cmd, PowerShell and Git Bash.
-    # Encode paths as data and explicitly forward the hook's JSON stdin as UTF-8.
-    quoted = " ".join("'" + arg.replace("'", "''") + "'" for arg in [python, *args])
-    program = ("$OutputEncoding = [System.Text.UTF8Encoding]::new($false); "
-               "$reader = [System.IO.StreamReader]::new([Console]::OpenStandardInput(), $OutputEncoding); "
-               "$payload = $reader.ReadToEnd(); $payload | & " + quoted + "; exit $LASTEXITCODE")
+    # Forward bytes directly: Windows PowerShell's text pipeline can change
+    # native-command stdin. Python handles UTF-8 via the explicit -X option.
+    executable = "'" + python.replace("'", "''") + "'"
+    arguments = "'" + subprocess.list2cmdline(args).replace("'", "''") + "'"
+    program = ("$start = [System.Diagnostics.ProcessStartInfo]::new(); "
+               "$start.FileName = " + executable + "; $start.Arguments = " + arguments + "; "
+               "$start.UseShellExecute = $false; $start.CreateNoWindow = $true; "
+               "$start.RedirectStandardInput = $true; $start.RedirectStandardOutput = $true; "
+               "$child = [System.Diagnostics.Process]::Start($start); "
+               "[Console]::OpenStandardInput().CopyTo($child.StandardInput.BaseStream); "
+               "$child.StandardInput.BaseStream.Close(); "
+               "$child.StandardOutput.BaseStream.CopyTo([Console]::OpenStandardOutput()); "
+               "$child.WaitForExit(); $exitCode = $child.ExitCode; $child.Dispose(); exit $exitCode")
     command = "powershell.exe -NoProfile -NonInteractive -EncodedCommand " + base64.b64encode(program.encode("utf-16-le")).decode("ascii")
     return {"type": "command", "command": command, "commandWindows": command, "timeout": timeout}
 
