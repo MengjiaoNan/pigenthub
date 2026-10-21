@@ -18,7 +18,7 @@ from platform_support import agent_home, hook_references
 PENDING_WINDOW = 30 * 60
 COMPACTION_WINDOW = 30 * 60
 QUESTION_TOOLS = {"AskUserQuestion", "request_user_input"}
-CLEAR_EVENTS = {"SessionStart", "UserPromptSubmit", "Stop", "SessionEnd", "Interrupt"}
+CLEAR_EVENTS = {"UserPromptSubmit", "Stop", "SessionEnd", "Interrupt"}
 ACTIONS = {"permission": {"allow", "deny", "reply", "stop"}, "question": {"reply", "stop"}}
 ANSWER_EVENTS = {
     "allow": "你在看板允许了本次请求", "deny": "你在看板拒绝了本次请求",
@@ -48,6 +48,15 @@ def fingerprint(payload):
     if isinstance(data, dict):
         data = {k: v for k, v in data.items() if k not in {"description", "justification"}}
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def matches_request(pending, payload, tool, digest):
+    turn, use_id = payload.get("turn_id"), payload.get("tool_use_id")
+    if turn and pending.get("turn_id") and turn != pending["turn_id"]:
+        return False
+    if use_id and pending.get("tool_use_id"):
+        return use_id == pending["tool_use_id"]
+    return pending.get("tool") == tool and pending.get("fingerprint") == digest
 
 
 def connect(path, timeout=0.5):
@@ -117,7 +126,7 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
     notification = payload.get("notification_type")
     if kind == "Notification" and notification not in {"permission_prompt", "elicitation_dialog", "elicitation_url_dialog"}:
         return False
-    if kind not in CLEAR_EVENTS | {"PermissionRequest", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "PreCompact", "PostCompact"}:
+    if kind not in CLEAR_EVENTS | {"SessionStart", "PermissionRequest", "PreToolUse", "PostToolUse", "PostToolUseFailure", "Notification", "PreCompact", "PostCompact"}:
         return False
     now = time() if now is None else now
     path = Path(path)
@@ -128,7 +137,7 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
         pending = state["pending"]
         description = None
         if kind == "PreCompact":
-            pending.clear()
+            # Compaction can occur while another tool still needs approval.
             state["compaction"] = {"started_at": now, "turn_id": payload.get("turn_id")}
             description = "正在压缩上下文"
         elif kind == "PostCompact":
@@ -136,16 +145,18 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
             if not (current.get("turn_id") and payload.get("turn_id") and current["turn_id"] != payload["turn_id"]):
                 state.pop("compaction", None)
             description = "上下文压缩已完成"
+        elif kind == "SessionStart":
+            # Resume/reconnect is not evidence that a pending request ended.
+            state.pop("compaction", None)
+            description = "会话状态已更新"
         elif kind in CLEAR_EVENTS:
             state.pop("compaction", None)
             pending.clear()
             description = {"Stop": "本轮停止通知", "Interrupt": "已中止", "SessionEnd": "会话已关闭"}.get(kind, "会话状态已更新")
         elif kind in {"PostToolUse", "PostToolUseFailure"}:
             state.pop("compaction", None)
-            use_id, digest = payload.get("tool_use_id"), fingerprint(payload)
-            matching = [p for p in pending if
-                        (use_id and p.get("tool_use_id") == use_id) or
-                        (p.get("tool") == tool and p.get("fingerprint") == digest)]
+            digest = fingerprint(payload)
+            matching = [p for p in pending if matches_request(p, payload, tool, digest)]
             # A generic network permission notification has no tool identity.
             generic = [p for p in pending if p.get("generic")]
             for p in matching + generic:
@@ -168,9 +179,10 @@ def record_hook(path, source, payload, now=None, request_id=None, answer_until=N
             # Notification often repeats an already observed PermissionRequest.
             if not (generic and pending):
                 digest = fingerprint(payload)
-                pending[:] = [p for p in pending if not (p.get("tool") == tool and p.get("fingerprint") == digest)]
+                pending[:] = [p for p in pending if not matches_request(p, payload, tool, digest)]
                 pending.append({"kind": "question" if question else "permission", "reason": reason,
                                 "tool": tool, "tool_use_id": payload.get("tool_use_id"),
+                                "turn_id": payload.get("turn_id"),
                                 "fingerprint": digest, "received_at": now, "generic": generic,
                                 "request_id": request_id, "answer_until": answer_until if request_id else None})
             description = "等待回答：" + reason if question else "发起审批：" + reason

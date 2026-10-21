@@ -120,7 +120,11 @@ class Transcript:
     def card(self, now):
         status, reason = self.status, self.reason
         if status == "running" and (self.activity_at is None or now - self.activity_at > ACTIVE_WINDOW):
-            status, reason = "unknown", "最后记录是运行中，但近期没有新事件；无法确认是否仍在工作"
+            if self.source == "Codex" and self.started_at is not None:
+                # A quiet tool or approval wait does not end an explicit turn.
+                reason = "本轮尚未结束，正在等待新的进展"
+            else:
+                status, reason = "unknown", "最后记录是运行中，但近期没有新事件；无法确认是否仍在工作"
         latest = self.messages[-1] if self.messages else None
         excerpt = latest["text"] if latest else ""
         kind = "任务摘录" if latest and latest["role"] == "user" else "回复摘录"
@@ -168,6 +172,8 @@ def read_codex(path, message_limit=MESSAGE_LIMIT):
                 result.message(role, request_text(text) if role == "user" else text, at)
             elif kind in {"function_call", "custom_tool_call"}:
                 result.event("调用工具 · " + str(p.get("name", "工具")), at)
+            elif kind in {"function_call_output", "custom_tool_call_output"}:
+                result.event("工具执行结果已写入", at)
         elif row.get("type") == "event_msg":
             if kind == "task_started":
                 result.turn_id = p.get("turn_id")
