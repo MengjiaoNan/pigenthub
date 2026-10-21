@@ -1,0 +1,55 @@
+name: PigentHub
+
+on:
+  push:
+    paths: ['**']
+  pull_request:
+    paths: ['**']
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ['3.10', '3.14']
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install environment
+        run: |
+          python -m venv .venv
+          if [[ "$RUNNER_OS" == 'Windows' ]]; then
+            echo 'VENV_PYTHON=.venv/Scripts/python.exe' >> "$GITHUB_ENV"
+            .venv/Scripts/python.exe -m pip install -r requirements.txt
+          else
+            echo 'VENV_PYTHON=.venv/bin/python' >> "$GITHUB_ENV"
+            .venv/bin/python -m pip install -r requirements.txt
+          fi
+      - name: Test
+        run: '"$VENV_PYTHON" -W error::ResourceWarning -m unittest discover -s tests -v'
+      - name: Windows entry points
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          call start-board.bat start --no-browser
+          if errorlevel 1 exit /b 1
+          call start-board.bat start --no-browser
+          if errorlevel 1 exit /b 1
+          call stop-board.bat
+          if errorlevel 1 exit /b 1
+      - name: POSIX entry points
+        if: runner.os != 'Windows'
+        run: |
+          sh start-board.sh start --no-browser
+          sh start-board.sh start --no-browser
+          sh stop-board.sh
