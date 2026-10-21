@@ -11,6 +11,7 @@ const systemCopy = {
   "已有新消息，等待本轮状态事件":"New message received. Waiting for a confirmed turn status.",
   "已有用户消息，等待可确认的执行记录":"Message received. Waiting for recorded activity.",
   "最后记录是运行中，但近期没有新事件；无法确认是否仍在工作":"No recent activity. The last running status is unconfirmed.",
+  "本轮尚未结束，正在等待新的进展":"This turn is still open. Waiting for an update.",
   "已读到本轮开始事件":"This turn has started.", "已读到本轮完成事件":"This turn has completed.",
   "本轮已中止":"This turn was interrupted.", "用户已中止本轮":"You interrupted this turn.",
   "最近记录显示 Agent 正在调用工具":"The latest activity is a tool call.",
