@@ -18,15 +18,15 @@ for candidate in "$PWD/.venv/bin/python" "${BOARD_PYTHON:-}" \
 done
 
 if [[ -z "$python_bin" ]]; then
-    print '需要先安装 Python 3.10 或更新版本，然后再次双击启动。'
-    print '下载地址：https://www.python.org/downloads/macos/'
-    [[ -t 0 ]] && read -r '?按回车关闭窗口……'
+    print 'Install Python 3.10 or newer, then double-click this launcher again.'
+    print 'Download: https://www.python.org/downloads/macos/'
+    [[ -t 0 ]] && read -r '?Press Enter to close this window...'
     exit 1
 fi
 
 "$python_bin" "$PWD/launcher.py" "$action" "${@:2}"
 result=$?
 if (( result != 0 )) && [[ -t 0 ]]; then
-    read -r '?按回车关闭窗口……'
+    read -r '?Press Enter to close this window...'
 fi
 exit "$result"
