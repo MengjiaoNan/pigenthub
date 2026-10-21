@@ -62,6 +62,10 @@ class PlatformTests(unittest.TestCase):
             root = Path(folder)
             for name in ["observer_hook.py", "live_events.py", "platform_support.py"]:
                 shutil.copy2(ROOT / name, root / name)
+            # Surface failures from the test fixture; installed observers stay passive.
+            observer = root / "observer_hook.py"
+            observer.write_text(observer.read_text(encoding="utf-8").replace(
+                "        pass\n", "        raise\n"), encoding="utf-8")
             payload = {"session_id": "88fa01dd-3b81-4e8e-94f5-4d104d307a53",
                        "hook_event_name": "PermissionRequest", "tool_name": "Write",
                        "tool_input": {"description": "请求写入中文文件"}}
