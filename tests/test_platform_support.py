@@ -32,7 +32,8 @@ class PlatformTests(unittest.TestCase):
         program = base64.b64decode(codex["command"].split()[-1]).decode("utf-16-le")
         self.assertIn("项目''s $folder", program)
         self.assertIn("[Console]::OpenStandardInput()", program)
-        self.assertIn("$reader.ReadToEnd()", program)
+        self.assertIn(".CopyTo($child.StandardInput.BaseStream)", program)
+        self.assertIn("$child.StandardOutput.BaseStream.CopyTo", program)
         self.assertTrue(hook_references(codex, str(root / "observer_hook.py")))
         self.assertEqual(codex["command"], codex["commandWindows"])
 
@@ -72,6 +73,9 @@ class PlatformTests(unittest.TestCase):
                                         text=True, encoding="utf-8", capture_output=True, timeout=15)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, "")
+                records = LiveEventStore(root / ".board/live-events.sqlite3").snapshot()
+                self.assertIn(source.lower() + ":" + payload["session_id"], records,
+                              f"{source} did not record the forwarded JSON: {result.stderr}")
             records = LiveEventStore(root / ".board/live-events.sqlite3").snapshot()
             self.assertEqual(len(records), 2)
             for state in records.values():

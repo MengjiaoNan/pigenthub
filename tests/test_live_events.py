@@ -9,6 +9,7 @@ from unittest.mock import patch
 from conversation_store import ConversationStore, iso
 from install_observers import merge_hooks
 from live_events import COMPACTION_WINDOW, LiveEventStore, PENDING_WINDOW, record_hook
+from platform_support import hook_references
 import observer_hook
 
 SESSION = "88fa01dd-3b81-4e8e-94f5-4d104d307a53"
@@ -55,7 +56,7 @@ class ObserverTests(unittest.TestCase):
     def test_compaction_stays_running_past_the_normal_idle_window(self):
         record_hook(self.path, "Codex", self.event("PreCompact", turn_id="turn-1"), now=self.now)
         stale = {**self.card(), "status": "unknown", "activity_at": iso(self.now - 100)}
-        card = self.store.overlay(stale, self.state(), now=self.now + 180)
+        card = self.store.overlay(dict(stale), self.state(), now=self.now + 180)
         self.assertEqual((card["status"], card["activity_phase"]), ("running", "compacting"))
         self.assertEqual(card["status_reason"], "正在压缩上下文")
         expired = self.store.overlay(dict(stale), self.state(), now=self.now + COMPACTION_WINDOW + 1)
@@ -81,7 +82,8 @@ class ObserverTests(unittest.TestCase):
         config = merge_hooks({}, "Codex")
         for event in ["PreCompact", "PostCompact"]:
             handler = config["hooks"][event][0]["hooks"][0]
-            self.assertIn("observer_hook.py", handler["command"])
+            self.assertTrue(hook_references(handler, "observer_hook.py"))
+            self.assertFalse(hook_references(handler, "approval_hook.py"))
         self.assertNotIn("PreCompact", merge_hooks({}, "Claude")["hooks"])
 
     def test_notifications_do_not_duplicate_permission_request(self):

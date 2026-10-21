@@ -10,15 +10,34 @@ import tempfile
 import time
 from threading import Thread
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from launcher import Launcher, LauncherError, ROOT
+from board_runtime import APP_ID
 
 
 def free_port():
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+class LauncherReadinessTests(unittest.TestCase):
+    def test_venv_redirector_uses_the_verified_server_pid(self):
+        with tempfile.TemporaryDirectory() as folder:
+            launcher = Launcher(Path(folder), ports=[8001])
+            redirector = Mock(pid=101)
+            redirector.poll.return_value = None
+            with patch("launcher.subprocess.Popen", return_value=redirector) as spawn:
+                def health(port):
+                    if spawn.call_args is None:
+                        return None
+                    return {"status": "ok", "app": APP_ID, "instance_id": launcher.identity,
+                            "launch_id": spawn.call_args.kwargs["env"]["BOARD_LAUNCH_ID"], "pid": 202}
+                with patch.object(launcher, "health", side_effect=health), \
+                        patch.object(launcher, "available", return_value=True):
+                    self.assertEqual(launcher.start(python=sys.executable), ("http://127.0.0.1:8001/", True))
+            self.assertEqual(launcher.state()["pid"], 202)
 
 
 class LauncherTests(unittest.TestCase):
